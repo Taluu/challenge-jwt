@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 // Replace with the name of the go package you wish to generate
-option go_package "gitlab.com/arnaud_gabsee/generated/infrapb;infrapb"
+option go_package = "generated/infrapb;infrapb";
 
 service Secrets {
     // Create a new Secret
