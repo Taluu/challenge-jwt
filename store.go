@@ -22,6 +22,7 @@ type SecretStore interface {
 	Save(context.Context, Secret) error
 	Delete(context.Context, string) error
 	List(context.Context) ([]Secret, error)
+	Contains(context.Context, string) (bool, error)
 }
 
 func NewSecretStore() SecretStore {
@@ -59,4 +60,13 @@ func (s *secretStore) List(ctx context.Context) ([]Secret, error) {
 	}
 
 	return result, nil
+}
+
+func (s *secretStore) Contains(ctx context.Context, name string) (bool, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	_, exists := s.secrets[name]
+
+	return exists, nil
 }
