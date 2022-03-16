@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 
 	"github.com/Taluu/gabsee-test/generated/infrapb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -40,4 +43,25 @@ func NewService(store SecretStore) *Service {
 	return &Service{
 		store: store,
 	}
+}
+
+func (s *Service) List(ctx context.Context, in *infrapb.Empty) (*infrapb.SecretList, error) {
+	secrets := make([]*infrapb.Secret, 0)
+	storedSecrets, err := s.store.List(ctx)
+
+	if err != nil {
+		return &infrapb.SecretList{}, status.Errorf(codes.Internal, "couldn't retrieve list of secrets : %s", err)
+	}
+
+	for _, v := range storedSecrets {
+		secrets = append(
+			secrets,
+			&infrapb.Secret{
+				Name:   v.Name,
+				Claims: v.Claims,
+			},
+		)
+	}
+
+	return &infrapb.SecretList{Secrets: secrets}, nil
 }
