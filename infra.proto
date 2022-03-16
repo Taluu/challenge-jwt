@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+// Replace with the name of the go package you wish to generate
+option go_package "gitlab.com/arnaud_gabsee/generated/infrapb;infrapb"
+
+service Secrets {
+    // Create a new Secret
+    // The claims provided in the Secret will be added into the jwt token.
+    // If provided, the "exp" claim overrides the one assigned by default.
+    rpc Create(Secret) returns (Secret) {}
+
+    // Update a new Secret
+    // Renew a secret's token.
+    // If provided, claims embedded in the token are updated.
+    rpc Update(Secret) returns (Secret) {}
+
+    // Delete secret with given name.
+    // Claims are ignored.
+    rpc Delete(Secret) returns (Empty) {}
+
+    // List all existing secrets.
+    rpc List(Empty) returns (SecretList) {}
+}
+
+
+message Secret {
+    string name = 1;
+    map<string, string> claims = 2;
+}
+
+message SecretList {
+    repeated Secret secrets = 1;
+}
+
+message Empty {}
