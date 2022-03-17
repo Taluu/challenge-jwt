@@ -6,15 +6,16 @@ option go_package = "generated/infrapb;infrapb";
 service Secrets {
     // Create a new Secret
     // The claims provided in the Secret will be added into the jwt token.
-    // If provided, the "exp" claim overrides the one assigned by default.
+    // If provided, the "exp" claim overrides the one assigned by default. If not, the token is
+    // given the service's default validity period.
     rpc Create(Secret) returns (Secret) {}
 
-    // Update a new Secret
-    // Renew a secret's token.
-    // If provided, claims embedded in the token are updated.
+    // Update a new Secret.
+    // If provided, the jwt's claims are updated.
+    // If no "exp" claim is provided, the secret is renewed with the service's default validity period.
     rpc Update(Secret) returns (Secret) {}
 
-    // Delete secret with given name.
+    // Delete a secret with given name.
     // Claims are ignored.
     rpc Delete(Secret) returns (Empty) {}
 
@@ -30,6 +31,9 @@ message Secret {
 
 message SecretList {
     repeated Secret secrets = 1;
+}
+
+message SecretListItem {
 }
 
 message Empty {}
