@@ -33,7 +33,4 @@ message SecretList {
     repeated Secret secrets = 1;
 }
 
-message SecretListItem {
-}
-
 message Empty {}

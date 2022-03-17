@@ -20,7 +20,7 @@ Since the generated token is only valid for a limited time, we need to renew the
 This is the job of the *Secrets* service you're about to write:
 
 * generate (JWT) tokens and create or update the associated Secret,
-* renews Secrets (generate a new JWT token with an updated `exp` claim) when they are about to expire.
+* a background task that renews Secrets (generate a new JWT token with an updated `exp` claim) when they are about to expire.
 
 Your mission is to implement this microservice as a gRPC service.
 
