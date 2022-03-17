@@ -125,7 +125,10 @@ func (s *Service) Update(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 		return in, status.Errorf(codes.InvalidArgument, "error when parsing time for the expiration date : %s", err)
 	}
 
-	in.Claims = secret.Claims
+	for k, v := range in.Claims {
+		secret.Claims[k] = v
+	}
+
 	secret.ExpiresAt = time.Unix(int64(expirationDate), 0)
 
 	//TODO : regenerate stored jwt token

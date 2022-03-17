@@ -38,7 +38,8 @@ func TestDelete(t *testing.T) {
 
 	// fixture
 	store.Save(ctx, Secret{
-		Name: "foo",
+		Name:   "foo",
+		Claims: map[string]string{},
 	})
 
 	client := infrapb.NewSecretsClient(conn.Dial(ctx))
@@ -93,7 +94,8 @@ func TestCreate(t *testing.T) {
 
 	// fixture
 	store.Save(ctx, Secret{
-		Name: "already existing",
+		Name:   "already existing",
+		Claims: map[string]string{},
 	})
 
 	t.Run("nominal", func(t *testing.T) {
@@ -198,6 +200,7 @@ func TestUpdate(t *testing.T) {
 		store.Save(ctx, Secret{
 			Name:      "my secret",
 			ExpiresAt: time.Now().Add(defaultExpirationDate),
+			Claims:    map[string]string{},
 		})
 
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
@@ -228,6 +231,7 @@ func TestUpdate(t *testing.T) {
 		store.Save(ctx, Secret{
 			Name:      "my secret",
 			ExpiresAt: time.Now().Add(expirationDuration),
+			Claims:    map[string]string{},
 		})
 
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
@@ -253,6 +257,7 @@ func TestUpdate(t *testing.T) {
 		store.Save(ctx, Secret{
 			Name:      "my secret",
 			ExpiresAt: time.Now(),
+			Claims:    map[string]string{},
 		})
 
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
@@ -268,6 +273,53 @@ func TestUpdate(t *testing.T) {
 
 		if err == nil {
 			t.Fatal("Expected a invalid argument error, got none")
+		}
+	})
+
+	t.Run("Claims are overwritten and unspecified claims are kept as is", func(t *testing.T) {
+		store.Save(ctx, Secret{
+			Name:      "my secret",
+			ExpiresAt: time.Now(),
+			Claims: map[string]string{
+				"Foo": "should be kept",
+				"Bar": "should be overwritten",
+			},
+		})
+
+		client := infrapb.NewSecretsClient(conn.Dial(ctx))
+		_, err := client.Update(
+			ctx,
+			&infrapb.Secret{
+				Name: "my secret",
+				Claims: map[string]string{
+					"Bar": "was overwritten",
+					"Baz": "new key !",
+				},
+			},
+		)
+
+		if err != nil {
+			t.Fatalf("Unexpected error : %s", err)
+		}
+
+		secret, _ := store.Fetch(ctx, "my secret")
+
+		expectedClaims := map[string]string{
+			"Foo": "should be kept",
+			"Bar": "was overwritten",
+			"Baz": "new key !",
+		}
+
+		for k, v := range expectedClaims {
+			value, ok := secret.Claims[k]
+
+			if !ok {
+				t.Fatalf("Expected a %s claim, didn't get it", k)
+			}
+
+			if value != v {
+				t.Fatalf("expected %s, got %s for %s claim", v, value, k)
+			}
 		}
 	})
 
