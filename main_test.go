@@ -239,3 +239,110 @@ func TestCreate(t *testing.T) {
 		}
 	})
 }
+
+func TestUpdate(t *testing.T) {
+	store := NewSecretStore()
+	conn := newTestConnection(t, store)
+
+	conn.Start()
+	defer conn.Stop()
+
+	ctx, cancel := newTestContext()
+	defer cancel()
+
+	now := time.Now()
+
+	// fixture
+	defaultExpirationDate, _ := time.ParseDuration(defaultExpirationDuration)
+
+	t.Run("nominal update", func(t *testing.T) {
+		store.Save(ctx, Secret{
+			Name:      "my secret",
+			ExpiresAt: time.Now().Add(defaultExpirationDate),
+		})
+
+		client := infrapb.NewSecretsClient(conn.Dial(ctx))
+		_, err := client.Update(
+			ctx,
+			&infrapb.Secret{
+				Name: "my secret",
+				Claims: map[string]string{
+					"exp": fmt.Sprint(now.Add(defaultExpirationDate).Unix() + 10), // add 10 seconds for modification sake
+				},
+			},
+		)
+
+		if err != nil {
+			t.Fatalf("Unexpected error : %s", err)
+		}
+
+		secret, _ := store.Fetch(ctx, "my secret")
+
+		if secret.ExpiresAt.Sub(time.Unix(now.Unix()+10, 0)) != defaultExpirationDate {
+			t.Fatalf("Invalid expiration date set ; expected %s, got %s", now.Add(defaultExpirationDate), secret.ExpiresAt)
+		}
+	})
+
+	t.Run("refresh token (no claims)", func(t *testing.T) {
+		expirationDuration, _ := time.ParseDuration("20s")
+
+		store.Save(ctx, Secret{
+			Name:      "my secret",
+			ExpiresAt: time.Now().Add(expirationDuration),
+		})
+
+		client := infrapb.NewSecretsClient(conn.Dial(ctx))
+		_, err := client.Update(
+			ctx,
+			&infrapb.Secret{
+				Name: "my secret",
+			},
+		)
+
+		if err != nil {
+			t.Fatalf("Unexpected error : %s", err)
+		}
+
+		secret, _ := store.Fetch(ctx, "my secret")
+
+		if secret.ExpiresAt.Sub(time.Unix(now.Unix(), 0)) != defaultExpirationDate {
+			t.Fatalf("Invalid expiration date set ; expected %s difference, got %s", defaultExpirationDate, secret.ExpiresAt.Sub(time.Unix(now.Unix()+10, 0)))
+		}
+	})
+
+	t.Run("with invalid expiration date", func(t *testing.T) {
+		store.Save(ctx, Secret{
+			Name:      "my secret",
+			ExpiresAt: time.Now(),
+		})
+
+		client := infrapb.NewSecretsClient(conn.Dial(ctx))
+		_, err := client.Update(
+			ctx,
+			&infrapb.Secret{
+				Name: "my secret",
+				Claims: map[string]string{
+					"exp": "foo bar baz",
+				},
+			},
+		)
+
+		if err == nil {
+			t.Fatal("Expected a invalid argument error, got none")
+		}
+	})
+
+	t.Run("unexisting secret", func(t *testing.T) {
+		client := infrapb.NewSecretsClient(conn.Dial(ctx))
+		_, err := client.Update(
+			ctx,
+			&infrapb.Secret{
+				Name: "not existing",
+			},
+		)
+
+		if err == nil {
+			t.Fatal("Should not be able to update a Secret that doesn't exist")
+		}
+	})
+}

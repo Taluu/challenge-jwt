@@ -122,3 +122,35 @@ func (s *Service) Create(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 
 	return in, nil
 }
+
+func (s *Service) Update(ctx context.Context, in *infrapb.Secret) (*infrapb.Secret, error) {
+	secret, err := s.store.Fetch(ctx, in.Name)
+
+	if err != nil {
+		return in, status.Errorf(codes.AlreadyExists, "secret name \"%s\" doesn't exists (%s)", in.Name, err)
+	}
+
+	if in.Claims == nil {
+		in.Claims = make(map[string]string)
+	}
+
+	if _, ok := in.Claims["exp"]; !ok {
+		expirationDate, _ := time.ParseDuration(defaultExpirationDuration)
+		in.Claims["exp"] = fmt.Sprint(time.Now().Add(expirationDate).Unix())
+	}
+
+	expirationDate, err := strconv.Atoi(in.Claims["exp"])
+
+	if err != nil {
+		return in, status.Errorf(codes.InvalidArgument, "error when parsing time for the expiration date : %s", err)
+	}
+
+	in.Claims = secret.Claims
+	secret.ExpiresAt = time.Unix(int64(expirationDate), 0)
+
+	//TODO : regenerate stored jwt token
+
+	s.store.Save(ctx, secret)
+
+	return in, nil
+}
