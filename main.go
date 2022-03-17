@@ -65,3 +65,13 @@ func (s *Service) List(ctx context.Context, in *infrapb.Empty) (*infrapb.SecretL
 
 	return &infrapb.SecretList{Secrets: secrets}, nil
 }
+
+func (s *Service) Delete(ctx context.Context, in *infrapb.Secret) (*infrapb.Empty, error) {
+	err := s.store.Delete(ctx, in.Name)
+
+	if err != nil {
+		return &infrapb.Empty{}, status.Errorf(codes.Internal, "couldn't delete secret : %s", err)
+	}
+
+	return &infrapb.Empty{}, nil
+}

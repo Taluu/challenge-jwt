@@ -85,3 +85,58 @@ func TestList(t *testing.T) {
 		t.Fatalf("Unexpected error : %s", err)
 	}
 }
+
+func TestDelete(t *testing.T) {
+	store := NewSecretStore()
+	conn := newTestConnection(t, store)
+
+	conn.Start()
+	defer conn.Stop()
+
+	ctx, cancel := newTestContext()
+	defer cancel()
+
+	// fixture
+	store.Save(ctx, Secret{
+		Name: "foo",
+	})
+
+	client := infrapb.NewSecretsClient(conn.Dial(ctx))
+	_, err := client.Delete(
+		ctx,
+		&infrapb.Secret{
+			Name: "foo",
+		},
+	)
+
+	if err != nil {
+		t.Fatalf("Unexpected error : %s", err)
+	}
+
+	if contains, _ := store.Contains(ctx, "foo"); contains {
+		t.Fatalf("Secret not deleted")
+	}
+}
+
+func TestDeleteUnknownSecret(t *testing.T) {
+	store := NewSecretStore()
+	conn := newTestConnection(t, store)
+
+	conn.Start()
+	defer conn.Stop()
+
+	ctx, cancel := newTestContext()
+	defer cancel()
+
+	client := infrapb.NewSecretsClient(conn.Dial(ctx))
+	_, err := client.Delete(
+		ctx,
+		&infrapb.Secret{
+			Name: "foo",
+		},
+	)
+
+	if err != nil {
+		t.Fatalf("Unexpected error : %s", err)
+	}
+}
