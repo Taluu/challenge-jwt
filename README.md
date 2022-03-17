@@ -1,7 +1,12 @@
 # Backend Hire Challenge
 
 This is the technical challenge for backend engineering candidates.
-It consists in implementing a gRPC microservice in Go.
+
+The it consists in implementing a small gRPC microservice in Go.
+
+## Disclaimer
+
+All materials you create for this test belong to you. This test is purely for evaluation purposes, we won’t use anything you share with us without your explicit permission.
 
 ## Your mission
 
@@ -21,7 +26,9 @@ This is the job of the *Secrets* service you're about to write:
 * generate (JWT) tokens and create or update the associated Secret,
 * a background task that renews Secrets (generate a new JWT token with an updated `exp` claim) when they are about to expire.
 
-Your mission is to implement this microservice as a gRPC service.
+Your mission is to implement this microservice as a gRPC service. This task is estimated to 4-6 hours for somebody who's already using Go and you shouldn't spend more than this.
+
+**It is okay if you don't finish**, especially if you're new to Go or gRPC: your code is the base for a discussion.
 
 ## Implementation
 
