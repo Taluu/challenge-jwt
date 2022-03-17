@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -8,6 +9,8 @@ import (
 	"github.com/Taluu/gabsee-test/generated/infrapb"
 	"github.com/golang-jwt/jwt"
 )
+
+const testSigningKey = "gisberg"
 
 func TestList(t *testing.T) {
 	store := NewSecretStore()
@@ -39,7 +42,7 @@ func TestDelete(t *testing.T) {
 
 	t.Run("existing secret", func(t *testing.T) {
 		// fixture
-		store.Save(ctx, NewSecret("foo"))
+		store.Save(ctx, NewSecret("foo", defaultTTL))
 
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
 		_, err := client.Delete(
@@ -103,7 +106,7 @@ func TestCreate(t *testing.T) {
 
 	t.Run("with an already existing Secret", func(t *testing.T) {
 		// fixture
-		store.Save(ctx, NewSecret("already existing"))
+		store.Save(ctx, NewSecret("already existing", defaultTTL))
 
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
 		_, err := client.Create(
@@ -191,7 +194,7 @@ func TestCreate(t *testing.T) {
 		}
 
 		token, _ := jwt.Parse(secret.Token, func(token *jwt.Token) (interface{}, error) {
-			return []byte(defaultSigningKey), nil
+			return []byte(testSigningKey), nil
 		})
 
 		if !token.Valid {
@@ -212,11 +215,8 @@ func TestUpdate(t *testing.T) {
 
 	now := time.Now()
 
-	// fixture
-	defaultExpirationDate, _ := time.ParseDuration(defaultExpirationDuration)
-
 	t.Run("nominal update", func(t *testing.T) {
-		store.Save(ctx, NewSecret("my secret"))
+		store.Save(ctx, NewSecret("my secret", defaultTTL))
 
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
 		_, err := client.Update(
@@ -224,7 +224,7 @@ func TestUpdate(t *testing.T) {
 			&infrapb.Secret{
 				Name: "my secret",
 				Claims: map[string]string{
-					"exp": fmt.Sprint(now.Add(defaultExpirationDate).Unix() + 10), // add 10 seconds for modification sake
+					"exp": fmt.Sprint(now.Add(defaultTTL).Unix() + 10), // add 10 seconds for modification sake
 				},
 			},
 		)
@@ -235,14 +235,14 @@ func TestUpdate(t *testing.T) {
 
 		secret, _ := store.Fetch(ctx, "my secret")
 
-		if secret.ExpiresAt.Sub(time.Unix(now.Unix()+10, 0)) != defaultExpirationDate {
-			t.Fatalf("Invalid expiration date set ; expected %s, got %s", now.Add(defaultExpirationDate), secret.ExpiresAt)
+		if secret.ExpiresAt.Sub(time.Unix(now.Unix()+10, 0)) != defaultTTL {
+			t.Fatalf("Invalid expiration date set ; expected %s, got %s", now.Add(defaultTTL), secret.ExpiresAt)
 		}
 	})
 
 	t.Run("refresh token (no claims)", func(t *testing.T) {
 		expirationDuration, _ := time.ParseDuration("20s")
-		storedSecret := NewSecret("my secret")
+		storedSecret := NewSecret("my secret", defaultTTL)
 		storedSecret.ExpiresAt = time.Now().Add(expirationDuration)
 
 		store.Save(ctx, storedSecret)
@@ -261,13 +261,13 @@ func TestUpdate(t *testing.T) {
 
 		secret, _ := store.Fetch(ctx, "my secret")
 
-		if secret.ExpiresAt.Sub(time.Unix(now.Unix(), 0)) != defaultExpirationDate {
-			t.Fatalf("Invalid expiration date set ; expected %s difference, got %s", defaultExpirationDate, secret.ExpiresAt.Sub(time.Unix(now.Unix()+10, 0)))
+		if secret.ExpiresAt.Sub(time.Unix(now.Unix(), 0)) != defaultTTL {
+			t.Fatalf("Invalid expiration date set ; expected %s difference, got %s", defaultTTL, secret.ExpiresAt.Sub(time.Unix(now.Unix()+10, 0)))
 		}
 	})
 
 	t.Run("with invalid expiration date", func(t *testing.T) {
-		store.Save(ctx, NewSecret("my secret"))
+		store.Save(ctx, NewSecret("my secret", defaultTTL))
 
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
 		_, err := client.Update(
@@ -286,7 +286,7 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("Claims are overwritten and unspecified claims are kept as is", func(t *testing.T) {
-		storedSecret := NewSecret("my secret")
+		storedSecret := NewSecret("my secret", defaultTTL)
 		storedSecret.Claims = map[string]string{
 			"Foo": "should be kept",
 			"Bar": "should be overwritten",
@@ -346,7 +346,7 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("JWT token is updated", func(t *testing.T) {
-		storedSecret := NewSecret("jwt")
+		storedSecret := NewSecret("jwt", defaultTTL)
 		store.Save(ctx, storedSecret)
 
 		oldToken := storedSecret.Token
@@ -388,7 +388,7 @@ func TestRenewExpiredTokens(t *testing.T) {
 	now := time.Now()
 	ctx := context.TODO()
 	store := NewSecretStore()
-	signingKey := []byte("signing key")
+	signingKey := []byte(testSigningKey)
 
 	tests := map[string]TestCmp{
 		"almost expired": TestCmp{expiresAt: now.Add(10 * time.Minute), shouldBeRenewed: true},
@@ -416,7 +416,11 @@ func TestRenewExpiredTokens(t *testing.T) {
 		tests[k] = v
 	}
 
-	service := NewService(store)
+	config := Config{
+		SigningKey: []byte("colonel gisberg"),
+	}
+
+	service := NewService(store, config)
 	service.renewExpiredSecrets(ctx, signingKey, 20*time.Minute, 5*time.Hour)
 
 	secrets, _ := store.List(ctx)

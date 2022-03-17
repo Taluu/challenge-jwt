@@ -27,7 +27,11 @@ func newTestConnection(t *testing.T, store SecretStore) *testConnection {
 		server: grpc.NewServer(),
 	}
 
-	infrapb.RegisterSecretsServer(c.server, NewService(store))
+	config := Config{
+		SigningKey: []byte(testSigningKey),
+	}
+
+	infrapb.RegisterSecretsServer(c.server, NewService(store, config))
 
 	return &c
 }

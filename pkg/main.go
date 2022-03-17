@@ -23,6 +23,7 @@ func main() {
 		server,
 		secrets.NewService(
 			secrets.NewSecretStore(),
+			secrets.Config{},
 		),
 	)
 

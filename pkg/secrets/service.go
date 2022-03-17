@@ -3,6 +3,7 @@ package secrets
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
@@ -13,27 +14,49 @@ import (
 )
 
 const (
-	defaultSigningKey     = "colonel_gisberg"
-	defaultTicker         = time.Second
-	defaultNearExpiration = time.Hour
+	defaultNearTTL        = time.Hour
+	defaultTickerDuration = time.Second
+	defaultTTL            = 24 * time.Hour
 )
+
+type Config struct {
+	TTL          time.Duration
+	NearTTL      time.Duration
+	TickDuration time.Duration
+
+	SigningKey []byte
+}
 
 // Service is the service that allow to interact with stored secrets through gRPC.
 type Service struct {
 	infrapb.UnimplementedSecretsServer
 
-	store              SecretStore
-	expirationDuration string
-	signingKey         []byte
+	store  SecretStore
+	config Config
 }
 
 // NewService creates a new service with a given secrets store.
-func NewService(store SecretStore) *Service {
-	s := &Service{
-		store: store,
+func NewService(store SecretStore, config Config) *Service {
+	if config.TTL == 0 {
+		config.TTL = defaultTTL
+	}
 
-		expirationDuration: defaultExpirationDuration,
-		signingKey:         []byte(defaultSigningKey),
+	if config.NearTTL == 0 {
+		config.NearTTL = defaultNearTTL
+	}
+
+	if config.TickDuration == 0 {
+		config.TickDuration = defaultTickerDuration
+	}
+
+	// if the signingKey is empty, it's up to the user. Let's send a warning anyways and carry on...
+	if len(config.SigningKey) == 0 {
+		log.Println("SigningKey is empty, it should have a value, as it's used to encrypt / decrypt the jwt tokens handled by this service.")
+	}
+
+	s := &Service{
+		store:  store,
+		config: config,
 	}
 
 	go s.backgroundRenewer()
@@ -82,8 +105,7 @@ func (s *Service) Create(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 	}
 
 	if _, ok := in.Claims["exp"]; !ok {
-		expirationDate, _ := time.ParseDuration(s.expirationDuration)
-		in.Claims["exp"] = fmt.Sprint(time.Now().Add(expirationDate).Unix())
+		in.Claims["exp"] = fmt.Sprint(time.Now().Add(s.config.TTL).Unix())
 	}
 
 	unix, err := strconv.Atoi(in.Claims["exp"])
@@ -94,7 +116,7 @@ func (s *Service) Create(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 
 	expirationDate := time.Unix(int64(unix), 0)
 
-	token, err := createToken(in.Name, in.Claims, s.signingKey)
+	token, err := createToken(in.Name, in.Claims, s.config.SigningKey)
 
 	if err != nil {
 		return in, status.Errorf(codes.Internal, "couldn't encode jwt: %s", err)
@@ -129,8 +151,7 @@ func (s *Service) Update(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 	}
 
 	if _, ok := in.Claims["exp"]; !ok {
-		expirationDate, _ := time.ParseDuration(s.expirationDuration)
-		in.Claims["exp"] = fmt.Sprint(time.Now().Add(expirationDate).Unix())
+		in.Claims["exp"] = fmt.Sprint(time.Now().Add(s.config.TTL).Unix())
 	}
 
 	expirationDate, err := strconv.Atoi(in.Claims["exp"])
@@ -145,7 +166,7 @@ func (s *Service) Update(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 
 	secret.ExpiresAt = time.Unix(int64(expirationDate), 0)
 
-	token, err := createToken(in.Name, in.Claims, s.signingKey)
+	token, err := createToken(in.Name, in.Claims, s.config.SigningKey)
 
 	if err != nil {
 		return in, status.Errorf(codes.Internal, "couldn't encode jwt: %s", err)
@@ -159,13 +180,13 @@ func (s *Service) Update(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 }
 
 func (s *Service) backgroundRenewer() {
-	ticker := time.NewTicker(defaultTicker)
-	ctx := context.Background()
-	nearExpirationDuration := defaultNearExpiration
-	expiredDuration, _ := time.ParseDuration(defaultExpirationDuration)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*s.config.TickDuration)
+	defer cancel()
+
+	ticker := time.NewTicker(s.config.TickDuration)
 
 	for range ticker.C {
-		s.renewExpiredSecrets(ctx, s.signingKey, nearExpirationDuration, expiredDuration)
+		s.renewExpiredSecrets(ctx, s.config.SigningKey, s.config.NearTTL, s.config.TTL)
 	}
 }
 

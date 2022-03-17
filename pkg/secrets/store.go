@@ -7,9 +7,7 @@ import (
 	"time"
 )
 
-const (
-	defaultExpirationDuration = "24h" // +1 day
-)
+const ()
 
 type Secret struct {
 	Name      string
@@ -18,12 +16,10 @@ type Secret struct {
 	Claims    map[string]string
 }
 
-func NewSecret(name string) Secret {
-	defaultExpirationDuration, _ := time.ParseDuration(defaultExpirationDuration)
-
+func NewSecret(name string, ttl time.Duration) Secret {
 	return Secret{
 		Name:      name,
-		ExpiresAt: time.Now().Add(defaultExpirationDuration),
+		ExpiresAt: time.Now().Add(ttl),
 		Claims:    map[string]string{},
 		Token:     "",
 	}
