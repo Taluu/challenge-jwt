@@ -2,7 +2,7 @@
 
 This is the technical challenge for backend engineering candidates.
 
-The it consists in implementing a small gRPC microservice in Go.
+It consists in implementing a small gRPC microservice in Go.
 
 ## Disclaimer
 
@@ -23,7 +23,7 @@ Since the generated token is only valid for a limited time, we need to renew the
 
 This is the job of the *Secrets* service you're about to write:
 
-* generate (JWT) tokens and create or update the associated Secret,
+* methods that allow to generate (JWT) tokens and create or update the associated Secret,
 * a background task that renews Secrets (generate a new JWT token with an updated `exp` claim) when they are about to expire.
 
 Your mission is to implement this microservice as a gRPC service. This task is estimated to 4-6 hours for somebody who's already using Go and you shouldn't spend more than this.
