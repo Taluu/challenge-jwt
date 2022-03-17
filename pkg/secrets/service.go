@@ -11,9 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const (
-	defaultExpirationDuration = "24h" // +1 day
-)
 
 // Service is the service that allow to interact with stored secrets through gRPC.
 type Service struct {

@@ -36,50 +36,40 @@ func TestDelete(t *testing.T) {
 	ctx, cancel := newTestContext()
 	defer cancel()
 
-	// fixture
-	store.Save(ctx, Secret{
-		Name:   "foo",
-		Claims: map[string]string{},
+	t.Run("existing secret", func(t *testing.T) {
+		// fixture
+		store.Save(ctx, NewSecret("foo"))
+
+		client := infrapb.NewSecretsClient(conn.Dial(ctx))
+		_, err := client.Delete(
+			ctx,
+			&infrapb.Secret{
+				Name: "foo",
+			},
+		)
+
+		if err != nil {
+			t.Fatalf("Unexpected error : %e", err)
+		}
+
+		if contains, _ := store.Contains(ctx, "foo"); contains {
+			t.Fatalf("Secret should have been deleted")
+		}
 	})
 
-	client := infrapb.NewSecretsClient(conn.Dial(ctx))
-	_, err := client.Delete(
-		ctx,
-		&infrapb.Secret{
-			Name: "foo",
-		},
-	)
+	t.Run("not existing secret", func(t *testing.T) {
+		client := infrapb.NewSecretsClient(conn.Dial(ctx))
+		_, err := client.Delete(
+			ctx,
+			&infrapb.Secret{
+				Name: "bar",
+			},
+		)
 
-	if err != nil {
-		t.Fatalf("Unexpected error : %e", err)
-	}
-
-	if contains, _ := store.Contains(ctx, "foo"); contains {
-		t.Fatalf("Secret not deleted")
-	}
-}
-
-func TestDeleteUnknownSecret(t *testing.T) {
-	store := NewSecretStore()
-	conn := newTestConnection(t, store)
-
-	conn.Start()
-	defer conn.Stop()
-
-	ctx, cancel := newTestContext()
-	defer cancel()
-
-	client := infrapb.NewSecretsClient(conn.Dial(ctx))
-	_, err := client.Delete(
-		ctx,
-		&infrapb.Secret{
-			Name: "foo",
-		},
-	)
-
-	if err != nil {
-		t.Fatalf("Unexpected error : %e", err)
-	}
+		if err != nil {
+			t.Fatalf("Unexpected error : %e", err)
+		}
+	})
 }
 
 func TestCreate(t *testing.T) {
@@ -91,12 +81,6 @@ func TestCreate(t *testing.T) {
 
 	ctx, cancel := newTestContext()
 	defer cancel()
-
-	// fixture
-	store.Save(ctx, Secret{
-		Name:   "already existing",
-		Claims: map[string]string{},
-	})
 
 	t.Run("nominal", func(t *testing.T) {
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
@@ -117,6 +101,9 @@ func TestCreate(t *testing.T) {
 	})
 
 	t.Run("with an already existing Secret", func(t *testing.T) {
+		// fixture
+		store.Save(ctx, NewSecret("already existing"))
+
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
 		_, err := client.Create(
 			ctx,
@@ -197,11 +184,7 @@ func TestUpdate(t *testing.T) {
 	defaultExpirationDate, _ := time.ParseDuration(defaultExpirationDuration)
 
 	t.Run("nominal update", func(t *testing.T) {
-		store.Save(ctx, Secret{
-			Name:      "my secret",
-			ExpiresAt: time.Now().Add(defaultExpirationDate),
-			Claims:    map[string]string{},
-		})
+		store.Save(ctx, NewSecret("my secret"))
 
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
 		_, err := client.Update(
@@ -227,12 +210,10 @@ func TestUpdate(t *testing.T) {
 
 	t.Run("refresh token (no claims)", func(t *testing.T) {
 		expirationDuration, _ := time.ParseDuration("20s")
+		storedSecret := NewSecret("my secret")
+		storedSecret.ExpiresAt = time.Now().Add(expirationDuration)
 
-		store.Save(ctx, Secret{
-			Name:      "my secret",
-			ExpiresAt: time.Now().Add(expirationDuration),
-			Claims:    map[string]string{},
-		})
+		store.Save(ctx, storedSecret)
 
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
 		_, err := client.Update(
@@ -254,11 +235,7 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("with invalid expiration date", func(t *testing.T) {
-		store.Save(ctx, Secret{
-			Name:      "my secret",
-			ExpiresAt: time.Now(),
-			Claims:    map[string]string{},
-		})
+		store.Save(ctx, NewSecret("my secret"))
 
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
 		_, err := client.Update(
@@ -277,14 +254,13 @@ func TestUpdate(t *testing.T) {
 	})
 
 	t.Run("Claims are overwritten and unspecified claims are kept as is", func(t *testing.T) {
-		store.Save(ctx, Secret{
-			Name:      "my secret",
-			ExpiresAt: time.Now(),
-			Claims: map[string]string{
-				"Foo": "should be kept",
-				"Bar": "should be overwritten",
-			},
-		})
+		storedSecret := NewSecret("my secret")
+		storedSecret.Claims = map[string]string{
+			"Foo": "should be kept",
+			"Bar": "should be overwritten",
+		}
+
+		store.Save(ctx, storedSecret)
 
 		client := infrapb.NewSecretsClient(conn.Dial(ctx))
 		_, err := client.Update(
