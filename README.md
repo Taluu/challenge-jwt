@@ -1,8 +1,7 @@
 # Backend Hire Challenge
 
 This is the technical challenge for backend engineering candidates.
-
-The it consists in implementing a small gRPC microservice in Go.
+It consists in implementing a gRPC microservice in Go.
 
 ## Your mission
 
