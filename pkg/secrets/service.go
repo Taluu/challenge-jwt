@@ -1,41 +1,18 @@
-package main
+package secrets
 
 import (
 	"context"
 	"fmt"
-	"log"
-	"net"
 	"strconv"
 	"time"
 
 	"github.com/Taluu/gabsee-test/generated/infrapb"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func main() {
-	log.Println("Server running ...")
-
-	listener, err := net.Listen("tcp", ":50051")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	server := grpc.NewServer()
-
-	infrapb.RegisterSecretsServer(
-		server,
-		NewService(
-			NewSecretStore(),
-		),
-	)
-
-	log.Fatalln(server.Serve(listener))
-}
-
 const (
-	defaultExpirationDuration = "86400s" // +1 day
+	defaultExpirationDuration = "24h" // +1 day
 )
 
 // Service is the service that allow to interact with stored secrets through gRPC.
