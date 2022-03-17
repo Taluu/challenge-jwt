@@ -40,4 +40,4 @@ You should focus on code quality (do not forget to write tests) and maintainabil
 Your solution should be stored in a public git repository and include:
 * A Dockerfile that allows to build the service's container.
 * Usage instructions in a README file.
-* [Optional but appreciated] A Makefile with `make`, `make image` and `make tests` targets.
+* [Optional but appreciated] A Makefile with at least `make`, `make image` and `make tests` targets.
