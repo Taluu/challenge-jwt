@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -23,6 +24,7 @@ type SecretStore interface {
 	Delete(context.Context, string) error
 	List(context.Context) ([]Secret, error)
 	Contains(context.Context, string) (bool, error)
+	Fetch(context.Context, string) (Secret, error)
 }
 
 func NewSecretStore() SecretStore {
@@ -69,4 +71,17 @@ func (s *secretStore) Contains(ctx context.Context, name string) (bool, error) {
 	_, exists := s.secrets[name]
 
 	return exists, nil
+}
+
+func (s *secretStore) Fetch(ctx context.Context, name string) (Secret, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	secret, exists := s.secrets[name]
+
+	if !exists {
+		return Secret{}, fmt.Errorf("no such secret")
+	}
+
+	return secret, nil
 }
