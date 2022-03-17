@@ -19,13 +19,16 @@ const (
 type Service struct {
 	infrapb.UnimplementedSecretsServer
 
-	store SecretStore
+	store              SecretStore
+	expirationDuration string
 }
 
 // NewService creates a new service with a given secrets store.
 func NewService(store SecretStore) *Service {
 	return &Service{
 		store: store,
+
+		expirationDuration: defaultExpirationDuration,
 	}
 }
 
@@ -70,7 +73,7 @@ func (s *Service) Create(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 	}
 
 	if _, ok := in.Claims["exp"]; !ok {
-		expirationDate, _ := time.ParseDuration(defaultExpirationDuration)
+		expirationDate, _ := time.ParseDuration(s.expirationDuration)
 		in.Claims["exp"] = fmt.Sprint(time.Now().Add(expirationDate).Unix())
 	}
 
@@ -112,7 +115,7 @@ func (s *Service) Update(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 	}
 
 	if _, ok := in.Claims["exp"]; !ok {
-		expirationDate, _ := time.ParseDuration(defaultExpirationDuration)
+		expirationDate, _ := time.ParseDuration(s.expirationDuration)
 		in.Claims["exp"] = fmt.Sprint(time.Now().Add(expirationDate).Unix())
 	}
 
