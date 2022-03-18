@@ -1,14 +1,39 @@
 # Backend Hire Challenge
 
+## Usage
+To build the service, just do a
+
+```shell
+make image
+```
+
+You can configure the service with the following env vars :
+- `SECRETS_TLL`: The duration secrets are living, By default, it's `24h`, and the format is a string that go's `time.Duration` can parse.
+- `SECRETS_NEAR_TTL`: The duration secrets are considered "nearly expired". By default, it's `1h`, and the format is a string that go's `time.Duration` can parse.
+- `SECRETS_TICKS`: Determine the time period the servie should check and renew (nearly) expired secrets. By default, it's `1s`, and the format is a string that go's `time.Duration` can parse.
+- `SECRETS_JWT_SIGNING_KEY`: The signing key to use when encoding / decoding the stored jwt token. By default, it's empty, but I cannot stress enough that if you want a bit of security, you should give it a value.
+
+Then once you're set, you can do the following :
+
+```shell
+docker run -p 50051:50051 dev/secrets
+```
+
+You can change the published port, add the env variable to configure the service as you see fit.
+
+-----
+
+## Original subject
+
 This is the technical challenge for backend engineering candidates.
 
 It consists in implementing a small gRPC microservice in Go.
 
-## Disclaimer
+### Disclaimer
 
 All materials you create for this test belong to you. This test is purely for evaluation purposes, we won’t use anything you share with us without your explicit permission.
 
-## Your mission
+### Your mission
 
 In Stories One's infrastructure, we spawn game servers dynamically in a Kubernetes cluster.
 These game servers need to be authenticated by the backend in order to be able to interact with the APIs.
@@ -30,7 +55,7 @@ Your mission is to implement this microservice as a gRPC service. This task is e
 
 **It is okay if you don't finish**, especially if you're new to Go or gRPC: your code is the base for a discussion.
 
-## Implementation
+### Implementation
 
 The `.proto` file that defines the gRPC service is provided: [infra.proto](./infra.proto).
 
@@ -41,7 +66,7 @@ encouraged to abstract the database using an interface and provide just an in-me
 
 You should focus on code quality (do not forget to write tests) and maintainability.
 
-## Delivery
+### Delivery
 
 Your solution should be stored in a public git repository and include:
 * A Dockerfile that allows to build the service's container.
