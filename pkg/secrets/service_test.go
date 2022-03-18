@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Taluu/gabsee-test/generated/infrapb"
+	"github.com/golang-jwt/jwt"
 )
 
 func TestList(t *testing.T) {
@@ -166,6 +167,37 @@ func TestCreate(t *testing.T) {
 			t.Fatalf("Secret was stored anyway, shouldn't be the case")
 		}
 	})
+
+	t.Run("JWT token is created and stored", func(t *testing.T) {
+		client := infrapb.NewSecretsClient(conn.Dial(ctx))
+		_, err := client.Create(
+			ctx,
+			&infrapb.Secret{
+				Name: "jwt",
+				Claims: map[string]string{
+					"Foo": "bar value",
+				},
+			},
+		)
+
+		if err != nil {
+			t.Fatalf("Unexpected error : %s", err)
+		}
+
+		secret, err := store.Fetch(ctx, "jwt")
+
+		if err != nil {
+			t.Fatalf("an error occured while saving the secrt : %s", err)
+		}
+
+		token, _ := jwt.Parse(secret.Token, func(token *jwt.Token) (interface{}, error) {
+			return []byte(defaultSigningKey), nil
+		})
+
+		if !token.Valid {
+			t.Fatalf("A valid token should have been stored")
+		}
+	})
 }
 
 func TestUpdate(t *testing.T) {
@@ -310,6 +342,38 @@ func TestUpdate(t *testing.T) {
 
 		if err == nil {
 			t.Fatal("Should not be able to update a Secret that doesn't exist")
+		}
+	})
+
+	t.Run("JWT token is updated", func(t *testing.T) {
+		storedSecret := NewSecret("jwt")
+		store.Save(ctx, storedSecret)
+
+		oldToken := storedSecret.Token
+
+		client := infrapb.NewSecretsClient(conn.Dial(ctx))
+		_, err := client.Update(
+			ctx,
+			&infrapb.Secret{
+				Name: "jwt",
+				Claims: map[string]string{
+					"Foo": "bar value",
+				},
+			},
+		)
+
+		if err != nil {
+			t.Fatalf("Unexpected error : %s", err)
+		}
+
+		secret, err := store.Fetch(ctx, "jwt")
+
+		if err != nil {
+			t.Fatalf("an error occured while saving the secrt : %s", err)
+		}
+
+		if secret.Token == oldToken {
+			t.Fatalf("The token should have been regenerated")
 		}
 	})
 }

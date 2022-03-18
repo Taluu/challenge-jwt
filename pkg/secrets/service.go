@@ -7,10 +7,14 @@ import (
 	"time"
 
 	"github.com/Taluu/gabsee-test/generated/infrapb"
+	"github.com/golang-jwt/jwt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
+const (
+	defaultSigningKey     = "colonel_gisberg"
+)
 
 // Service is the service that allow to interact with stored secrets through gRPC.
 type Service struct {
@@ -18,6 +22,7 @@ type Service struct {
 
 	store              SecretStore
 	expirationDuration string
+	signingKey         []byte
 }
 
 // NewService creates a new service with a given secrets store.
@@ -26,6 +31,7 @@ func NewService(store SecretStore) *Service {
 		store: store,
 
 		expirationDuration: defaultExpirationDuration,
+		signingKey:         []byte(defaultSigningKey),
 	}
 }
 
@@ -82,7 +88,11 @@ func (s *Service) Create(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 
 	expirationDate := time.Unix(int64(unix), 0)
 
-	//TODO: generate jwt token
+	token, err := createToken(in.Name, in.Claims, s.signingKey)
+
+	if err != nil {
+		return in, status.Errorf(codes.Internal, "couldn't encode jwt: %s", err)
+	}
 
 	err = s.store.Save(
 		ctx,
@@ -90,6 +100,7 @@ func (s *Service) Create(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 			Name:      in.Name,
 			Claims:    in.Claims,
 			ExpiresAt: expirationDate,
+			Token:     token,
 		},
 	)
 
@@ -128,9 +139,31 @@ func (s *Service) Update(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 
 	secret.ExpiresAt = time.Unix(int64(expirationDate), 0)
 
-	//TODO : regenerate stored jwt token
+	token, err := createToken(in.Name, in.Claims, s.signingKey)
+
+	if err != nil {
+		return in, status.Errorf(codes.Internal, "couldn't encode jwt: %s", err)
+	}
+
+	secret.Token = token
 
 	s.store.Save(ctx, secret)
 
 	return in, nil
+}
+
+func createToken(name string, claims map[string]string, signingKey []byte) (string, error) {
+	tokenClaims := jwt.MapClaims{}
+	tokenClaims["id"] = name
+
+	for k, v := range claims {
+		tokenClaims[k] = v
+	}
+
+	// overwrite the exp to be a number rather than a string
+	tokenClaims["exp"], _ = strconv.Atoi(claims["exp"])
+
+	return jwt.
+		NewWithClaims(jwt.SigningMethodHS256, tokenClaims).
+		SignedString(signingKey)
 }
