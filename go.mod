@@ -1,4 +1,4 @@
-module github.com/Taluu/gabsee-test
+module github.com/Taluu/challenge-jwt
 
 go 1.18
 

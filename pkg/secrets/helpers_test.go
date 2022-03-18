@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Taluu/gabsee-test/generated/infrapb"
+	"github.com/Taluu/challenge-jwt/generated/infrapb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 )

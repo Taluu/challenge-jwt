@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Taluu/gabsee-test/generated/infrapb"
-	"github.com/Taluu/gabsee-test/pkg/secrets"
+	"github.com/Taluu/challenge-jwt/generated/infrapb"
+	"github.com/Taluu/challenge-jwt/pkg/secrets"
 	"google.golang.org/grpc"
 )
 

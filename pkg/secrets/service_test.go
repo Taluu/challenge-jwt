@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Taluu/gabsee-test/generated/infrapb"
+	"github.com/Taluu/challenge-jwt/generated/infrapb"
 	"github.com/golang-jwt/jwt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
