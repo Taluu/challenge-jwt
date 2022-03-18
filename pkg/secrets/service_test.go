@@ -8,6 +8,8 @@ import (
 
 	"github.com/Taluu/gabsee-test/generated/infrapb"
 	"github.com/golang-jwt/jwt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const testSigningKey = "gisberg"
@@ -22,11 +24,19 @@ func TestList(t *testing.T) {
 	ctx, cancel := newTestContext()
 	defer cancel()
 
+	store.Save(ctx, NewSecret("foo", defaultTTL))
+	store.Save(ctx, NewSecret("bar", defaultTTL))
+	store.Save(ctx, NewSecret("baz", defaultTTL))
+
 	client := infrapb.NewSecretsClient(conn.Dial(ctx))
-	_, err := client.List(ctx, &infrapb.Empty{})
+	res, err := client.List(ctx, &infrapb.Empty{})
 
 	if err != nil {
 		t.Fatalf("Unexpected error : %e", err)
+	}
+
+	if len(res.Secrets) != 3 {
+		t.Fatalf("Expected 3 secrets, got %d", len(res.Secrets))
 	}
 }
 
@@ -119,6 +129,12 @@ func TestCreate(t *testing.T) {
 		if err == nil {
 			t.Fatal("Should not be able to store an already stored secret")
 		}
+
+		statusErr, _ := status.FromError(err)
+
+		if statusErr.Code() != codes.AlreadyExists {
+			t.Fatalf("Expected a status %s, got %s", codes.AlreadyExists, statusErr.Code())
+		}
 	})
 
 	t.Run("with expiration date", func(t *testing.T) {
@@ -155,7 +171,7 @@ func TestCreate(t *testing.T) {
 		_, err := client.Create(
 			ctx,
 			&infrapb.Secret{
-				Name: "valid expiration date",
+				Name: "with invalid expiration date",
 				Claims: map[string]string{
 					"exp": "foo bar baz",
 				},
@@ -166,7 +182,13 @@ func TestCreate(t *testing.T) {
 			t.Fatal("Expected a invalid argument error, got none")
 		}
 
-		if contains, _ := store.Contains(ctx, "foo"); contains {
+		statusErr, _ := status.FromError(err)
+
+		if statusErr.Code() != codes.InvalidArgument {
+			t.Fatalf("Expected a status %s, got %s", codes.InvalidArgument, statusErr.Code())
+		}
+
+		if contains, _ := store.Contains(ctx, "with invalid expiration date"); contains {
 			t.Fatalf("Secret was stored anyway, shouldn't be the case")
 		}
 	})
