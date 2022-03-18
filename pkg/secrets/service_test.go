@@ -377,3 +377,62 @@ func TestUpdate(t *testing.T) {
 		}
 	})
 }
+
+func TestRenewExpiredTokens(t *testing.T) {
+	type TestCmp struct {
+		expiresAt       time.Time
+		shouldBeRenewed bool
+		token           string
+	}
+
+	now := time.Now()
+	ctx := context.TODO()
+	store := NewSecretStore()
+	signingKey := []byte("signing key")
+
+	tests := map[string]TestCmp{
+		"almost expired": TestCmp{expiresAt: now.Add(10 * time.Minute), shouldBeRenewed: true},
+		"expired":        TestCmp{expiresAt: now.Add(-5 * time.Minute), shouldBeRenewed: true},
+		"still alive":    TestCmp{expiresAt: now.Add(5 * time.Hour), shouldBeRenewed: false},
+	}
+
+	for k, v := range tests {
+		claims := map[string]string{
+			"exp": fmt.Sprint(v.expiresAt.Unix()),
+		}
+
+		v.token, _ = createToken(k, claims, signingKey)
+
+		store.Save(
+			ctx,
+			Secret{
+				Name:      k,
+				ExpiresAt: v.expiresAt,
+				Claims:    claims,
+				Token:     v.token,
+			},
+		)
+
+		tests[k] = v
+	}
+
+	service := NewService(store)
+	service.renewExpiredSecrets(ctx, signingKey, 20*time.Minute, 5*time.Hour)
+
+	secrets, _ := store.List(ctx)
+
+	for _, v := range secrets {
+		test := tests[v.Name]
+		result := v.ExpiresAt.Equal(test.expiresAt)
+
+		if result == test.shouldBeRenewed {
+			t.Errorf("%s :: Expiration not properly updated (got %s == %s (%v), wanted %v)", v.Name, v.ExpiresAt, test.expiresAt, result, test.shouldBeRenewed)
+		}
+
+		result = test.token == v.Token
+
+		if result == test.shouldBeRenewed {
+			t.Errorf("%s :: JWT not properly updated (got %v, wanted %v)", v.Name, result, test.shouldBeRenewed)
+		}
+	}
+}

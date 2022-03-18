@@ -14,6 +14,8 @@ import (
 
 const (
 	defaultSigningKey     = "colonel_gisberg"
+	defaultTicker         = time.Second
+	defaultNearExpiration = time.Hour
 )
 
 // Service is the service that allow to interact with stored secrets through gRPC.
@@ -27,12 +29,16 @@ type Service struct {
 
 // NewService creates a new service with a given secrets store.
 func NewService(store SecretStore) *Service {
-	return &Service{
+	s := &Service{
 		store: store,
 
 		expirationDuration: defaultExpirationDuration,
 		signingKey:         []byte(defaultSigningKey),
 	}
+
+	go s.backgroundRenewer()
+
+	return s
 }
 
 func (s *Service) List(ctx context.Context, in *infrapb.Empty) (*infrapb.SecretList, error) {
@@ -150,6 +156,46 @@ func (s *Service) Update(ctx context.Context, in *infrapb.Secret) (*infrapb.Secr
 	s.store.Save(ctx, secret)
 
 	return in, nil
+}
+
+func (s *Service) backgroundRenewer() {
+	ticker := time.NewTicker(defaultTicker)
+	ctx := context.Background()
+	nearExpirationDuration := defaultNearExpiration
+	expiredDuration, _ := time.ParseDuration(defaultExpirationDuration)
+
+	for range ticker.C {
+		s.renewExpiredSecrets(ctx, s.signingKey, nearExpirationDuration, expiredDuration)
+	}
+}
+
+func (s *Service) renewExpiredSecrets(ctx context.Context, signingKey []byte, nearExpirationDuration time.Duration, ttl time.Duration) {
+	secrets, err := s.store.List(ctx)
+
+	if err != nil {
+		return
+	}
+
+	for _, secret := range secrets {
+		if time.Now().Add(nearExpirationDuration).Before(secret.ExpiresAt) {
+			continue
+		}
+
+		token, _ := jwt.Parse(secret.Token, func(token *jwt.Token) (interface{}, error) {
+			return []byte(signingKey), nil
+		})
+
+		newExpiredAt := time.Now().Add(ttl)
+
+		claims := token.Claims.(jwt.MapClaims)
+		claims["exp"] = newExpiredAt.Unix()
+
+		secret.ExpiresAt = newExpiredAt
+		secret.Claims["exp"] = fmt.Sprint(newExpiredAt.Unix())
+		secret.Token, _ = token.SignedString(signingKey)
+
+		s.store.Save(ctx, secret)
+	}
 }
 
 func createToken(name string, claims map[string]string, signingKey []byte) (string, error) {
