@@ -13,6 +13,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+//go:generate protoc -I ../../ --go_out=../../. --go-grpc_out=../../. infra.proto
+
 const (
 	defaultNearTTL        = time.Hour
 	defaultTickerDuration = time.Second
